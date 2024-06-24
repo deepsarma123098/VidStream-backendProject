@@ -16,6 +16,11 @@ const connectDB = async ()=> {
       //connectionInstance here store all the responses after the connection was established/ or data are hold in the connectionInstance.
       console.log(`\n MongoDB connected!! DB HOST ": ${connectionInstance}`);
 
+      app.on("error", (err)=>{
+        console.log("ERROR: ", err);
+        throw err;
+      })
+
      
 
     } catch (error) {
