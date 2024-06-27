@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import express from "express";
+
 const app = express()
 
 import { DB_NAME } from "../constants.js";
@@ -14,7 +15,7 @@ const connectDB = async ()=> {
        const connectionInstance = await mongoose.connect(`${process.env.MONGODB_URI}/${DB_NAME}`)
 
       //connectionInstance here store all the responses after the connection was established/ or data are hold in the connectionInstance.
-      console.log(`\n MongoDB connected!! DB HOST ": ${connectionInstance}`);
+      console.log(`\n MongoDB connected!! DB HOST ": ${connectionInstance.connection.host}`);
 
       app.on("error", (err)=>{
         console.log("ERROR: ", err);
