@@ -23,7 +23,8 @@ import fs from 'fs'
             
             console.log(response.url);
             //filehas been uploaded successfully
-            console.log("File is uploaded on cludinary ", response.url);
+            // console.log("File is uploaded on cludinary ", response.url);
+            fs.unlinkSync(localFilePath) //remove the localfile syncronously after uploading
 
             return response 
            

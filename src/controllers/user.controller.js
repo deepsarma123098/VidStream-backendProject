@@ -4,6 +4,28 @@ import { User } from "../models/User.model.js"
 import { uploadOnCloudinary } from '../utlis/cloudinary.js'
 import { ApiResponse } from '..//utlis/ApiResponse.js'
 
+
+
+//Since the below method is common so we create a method for it and we are not using asyncHandler here as we are not require to handleany routes or complex handling. This is used for this file only.
+
+const generateAccessAndRefreshTokens = async(userId)=> {
+   try {
+
+      const userToken = await User.findById(userId)
+
+      const accessToken = userToken.generateAccessToken()
+      const refreshToken = userToken.generateRefreshToken()
+
+      userToken.refreshToken = refreshToken;
+      await userToken.save({ validateBeforeSave: false })
+
+      return {accessToken, refreshToken}
+      
+   } catch (error) {
+      throw new ApiError(500, "Something went wrong while generating feresh and access token")
+   }
+}
+
 const registerUser = asyncHandler (async(req, res)=> {
  
     //get user details from frontend (we can do that using postman also)
@@ -32,7 +54,7 @@ const registerUser = asyncHandler (async(req, res)=> {
         throw new ApiError(400, "@ is required in mail field")
      }
  
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [{ username }, { email }]
      })
 
@@ -47,10 +69,20 @@ const registerUser = asyncHandler (async(req, res)=> {
 
 //     }
 
+
+   //   console.log(req.files);
+
     const avatarLocalPath =  req.files?.avatar[0]?.path 
     // This gives us the path uploaded by multer. Multer uploads the file in the server and so after that we are able to access the path.
 
-    const coverImageLocalPath = req.files?.coverImage[0]?.path; 
+   //  const coverImageLocalPath = req.files?.coverImage[0]?.path; 
+
+    let coverImageLocalPath;
+    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length> 0) {
+      coverImageLocalPath = req.files.coverImage[0].path //Now ths will not throw error. This is the classic way of checking.For avatar also we can check in this manner.
+
+      //TypeError: Cannot read properties of undefined (reading '0')
+    }
 
     //These path may or may not be there but avatar path path must be there. Multer has uploaded the path but we need to checkif it has reached our local server or not.
 
@@ -92,5 +124,96 @@ const registerUser = asyncHandler (async(req, res)=> {
 
 })
 
+const loginUser = asyncHandler( async (req, res)=> {
+//Enter email or username and check it if it is present in the database
+//Check the password, use the compare method 
+//access and refresh token
+//send cookie
+//If matches login the user
 
-export {registerUser}
+   const {username, email, password} = req.body;
+
+   if(!username || !email) {
+      throw new ApiError(400, "Uername or email is required")
+   }
+
+   const user = await User.findOne({
+      $or: [{email},{username}]
+   })
+
+   if(!user){
+      throw new ApiError(404, "User doesn't exist")
+   }
+
+   //15:45, user and User use,  user is the instance of the user we created and recieve from the database. 
+
+   const isPasswordValid = await user.isPasswordCorrect(password)
+
+   if(!isPasswordValid){
+      throw new ApiError(401, "Invalid user credentials")
+   }
+
+  const {accessToken, refreshToken} = await generateAccessAndRefreshTokens(user._id)
+
+   //Here we have to decide if this an expensive operation. If not then call the database once again and if it is then update the previous user rather than calling the database
+
+   const loggedInUser = await User.findById(user._id).select("-password -refreshToken") //optional step i.e. if the call is required and if not in industryy. Here we have called
+
+   const options = { 
+      httpOnly: true,
+      secure: true,
+   }
+
+   return res
+   .status(200)
+   .cookie("accessToken", accessToken, options)
+   .cookie("refreshToken", refreshToken, options)
+   .json(
+      new ApiResponse(
+         200,
+         {
+            user: loggedInUser, accessToken, refreshToken
+         },
+         "User logged in successfully"
+      )
+   )
+
+})
+
+const logoutUser = asyncHandler(async(req, res, next)=> { 
+
+   //Remove refersh token
+   //Remove cookies, then only the user will be loggedout
+
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+         $set: {
+            refreshToken: undefined
+         }
+      },
+      {
+         new: true
+      }
+     )
+
+     const options = { 
+      httpOnly: true,
+      secure: true,
+   }
+
+   return res.
+   status(200)
+   .clearCookie("accessToken", options)
+   .clearCookie("refreshToken", options)
+   .json(new ApiResponse(200, {}, "User loggedout successfully"))
+
+
+})
+
+
+export {
+   registerUser,
+   loginUser,
+   logoutUser
+}
