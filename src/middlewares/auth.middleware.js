@@ -25,7 +25,7 @@ export const verifyJWT = asyncHandler(async (req,res, next)=> {
     )
  
     if(!user) {
-     //TODO discussion about frontend
+     
      throw new ApiError(401, "Invalid Access Token")
     }
  
@@ -34,6 +34,19 @@ export const verifyJWT = asyncHandler(async (req,res, next)=> {
     next();
    } catch (error) {
       throw new ApiError(401, error?.message || "Invalid Access Token")
+      
+      /* My code,i.e. there are scenarios where the token may be expired, JsonWebTokenError: This is a generic error for JWT-related issues, such as an invalid token, NotBeforeError: This error occurs when the token is not yet active. JWTs can have a "not before" (nbf) field that indicates the time before which the token should not be accepted for processing, so to avoid such secnrios we use a try catch block inside asyncHandler in JWT where we pass a custom message or check thecondtions and then send the message retaled to that error.
+
+      if (error.name === 'TokenExpiredError') {
+      throw new ApiError(401, "Token has expired");
+    } else if (error.name === 'JsonWebTokenError') {
+      throw new ApiError(401, "Invalid token");
+    } else if (error.name === 'NotBeforeError') {
+      throw new ApiError(401, "Token not active");
+    } else {
+      throw new ApiError(401, error.message || "Invalid Access Token");
+    }*/
+
    }
 
 
