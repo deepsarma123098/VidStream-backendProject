@@ -4,6 +4,7 @@ import { User } from "../models/User.model.js"
 import { uploadOnCloudinary } from '../utlis/cloudinary.js'
 import { ApiResponse } from '..//utlis/ApiResponse.js'
 import jwt from "jsonwebtoken";
+import { upload } from "../middlewares/multer.middleware.js";
 
 
 
@@ -260,9 +261,137 @@ const refreshAccessToken = asyncHandler(async(req,res)=> {
     }
 })
 
+const changeCurrentPassword =  asyncHandler(async(req, res)=> {
+
+   const {oldPassword, newPassword} = req.body
+
+   const user = await User.findById(req.user?._id)  //Check for error hereif occurs as I have use _id and in vide used id
+
+   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)  // await becuase 'isPasswordCorrect' is defined as an async function
+
+    if(!isPasswordCorrect){
+      throw new ApiError(400, "Invalid password")
+    }
+    
+    user.password = newPassword
+    await user.save({validateBeforeSave:false})  //19:40
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Passwprd changed successfully"))
+})
+
+const getCurrentUser = asyncHandler(async(req, res)=> {
+      return res
+      .status(200)
+      .json(200, req.user, "Current user fetched successfully")
+})
+
+const updateAccountDetails = asyncHandler(async(req,res)=> {
+       
+    const {fullName, email} = req.body
+
+    if(!fullName || !email){
+          throw new ApiError(400, "All dields are required")
+    }
+
+   const user =  User.findByIdAndUpdate(
+      req.user?._id,
+   {
+      $set: {
+         fullName,
+         email,
+      }
+   },
+   {
+      new:true
+   }
+).select("-password")  // We can use this method in a next step also calling again the database but we are saving the call
+
+ return res
+ .status(200)
+ .json(new ApiResponse(200, user, "Account Details updated successfully"))
+
+    //For file uploading try to have different end points where only the files are uploaded i.e. for fileslike images try to have different end pointsand controllers fo file upload or else all the text along with the file will be send again and again if any one i.e. text or file is uploaded.
+})
+
+const updateUserAvatar = asyncHandler(async(req,res)=> {
+
+   const avatarlocalPath = req.file?.path //req.file and not req.files as it is a single file here but if multiple files are present then we use req.files
+
+   //const avatarlocalPath = req.file?.path we can save this path directly in local database if we don't want to upload to cloudinary
+
+   if(!avatarlocalPath){
+      throw new ApiError(400, "Avatar file is missing")
+   }
+
+   const avatar = await uploadOnCloudinary(avatarlocalPath)
+
+   if(!avatar.url){
+      throw new ApiError(400, "Error while uploading avatar on cloudinary")
+   }
+
+   const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+         $set: {
+               avatar: avatar.url
+         }
+      },
+      {new: true}
+   
+   ).select("-password")
+
+   return res
+   .status(200)
+   .json(
+      new ApiResponse(200, user, "Avatar uploaded successfully")
+   )
+
+})
+
+const updateUserCoverImage = asyncHandler(async(req,res)=> {
+
+   const coverImageLocalPath = req.file?.path 
+   
+   if(!coverImageLocalPath){
+      throw new ApiError(400, "Cover Image file is missing")
+   }
+
+   const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+
+   if(!coverImage.url){
+      throw new ApiError(400, "Error while uploading cover image on cloudinary")
+   }
+
+  const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+         $set: {
+            coverImage: coverImage.url
+         }
+      },
+      {new: true}
+   
+   ).select("-password")
+
+   return res
+   .status(200)
+   .json(
+      new ApiResponse(200, user, "Cover Image uploaded successfully")
+   )
+
+})
+
+
 export {
    registerUser,
    loginUser,
    logoutUser,
-   refreshAccessToken
+   refreshAccessToken,
+   changeCurrentPassword,
+   getCurrentUser,
+   updateAccountDetails,
+   updateUserAvatar,
+   updateUserCoverImage
 }
