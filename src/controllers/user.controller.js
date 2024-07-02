@@ -12,13 +12,13 @@ import jwt from "jsonwebtoken";
 const generateAccessAndRefreshTokens = async(userId)=> {
    try {
 
-      const userToken = await User.findById(userId)
+      const user = await User.findById(userId)
 
       const accessToken = userToken.generateAccessToken()
       const refreshToken = userToken.generateRefreshToken()
 
-      userToken.refreshToken = refreshToken;
-      await userToken.save({ validateBeforeSave: false })
+      user.refreshToken = refreshToken;
+      await user.save({ validateBeforeSave: false })
 
       return {accessToken, refreshToken}
       
@@ -243,7 +243,7 @@ const refreshAccessToken = asyncHandler(async(req,res)=> {
         secure: true
       }
   
-     const {accessToken, newRefreshToken}  =await generateAccessAndRefreshTokens(user._id)
+     const {accessToken, newRefreshToken}  = await generateAccessAndRefreshTokens(user._id)
      return res
      .status(200)
      .cookie("accessToken", accessToken, options)
