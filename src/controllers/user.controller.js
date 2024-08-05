@@ -147,7 +147,7 @@ const loginUser = asyncHandler( async (req, res)=> {
       throw new ApiError(404, "User doesn't exist")
    }
 
-   //15:45, user and User use,  user is the instance of the user we created and recieve from the database. 
+   //15:45, user and User use,  user is the instance of the User we created and recieve from the database. 
 
    const isPasswordValid = await user.isPasswordCorrect(password)
 
@@ -384,6 +384,96 @@ const updateUserCoverImage = asyncHandler(async(req,res)=> {
 })
 
 
+const getUserChannelProfile = asyncHandler(async(req, res)=> {
+     const {username} = req.params
+
+     if(!username?.trim()) {
+      throw new ApiError(400, "UserName is missing")
+     }
+
+     // User.find({username})
+     
+     // Finding the user like this and then applying ggregation can be done. But we can also apply aggregation directly, so we skip this step and apply directly. The $match operator collevcts the document that we need.
+
+     //The values retured from aggregate pipelines are arrays.
+
+    const channel = await User.aggregate([
+    {
+      $match : {
+         username: username?.toLowerCase()
+      }
+   },
+
+   {
+      $lookup: {
+         from: "subscriptions",
+         localField:"_id" ,
+         foreignField: "channel",
+         as: "subscribers"
+      }
+    },
+    {
+      $lookup: {
+         from: "subscriptions",
+         localField:"_id" ,
+         foreignField: "subscriber",
+         as: "subscribedTo"
+      }
+    },
+    {
+      $addFields: {  //This field adds the existing fields and also new fileds that we define inside it
+         subscribersCount: {
+            $size: "$subscribers"  /*To calculate all the documents we use $size and we pass the filed from where we have to count from*/
+         },
+         channelSubscribedToCount: {
+            $size: "$subscribedTo"
+         },
+         isSubscribed: {
+                //$cond contains three parameters: first if, then and else. If true then "then" and if false then "else" will execute.
+               //$in calculates inside of both array and objects. SYntax: $in:[what to check, from the array/object]
+                $cond: {
+                  if: {$in: [req.user?._id, "$subscribers.subscriber"]},  ///Using $ we mention that it is a field i.e. $subscribers field and now and we can propagate inside it.
+                  then: true,
+                  else: false
+                }
+         }
+      }
+    },  
+
+    {
+        //$project gives projection of the selected values
+
+        $project: {
+         fullName: 1,
+         username: 1,
+         subscribersCount: 1,
+         channelSubscribedToCount: 1,
+         isSubscribed: 1,
+         avatar: 1,
+         coverImage:1,
+         email:1,
+        }
+    }
+  
+
+
+ 
+
+
+     ])
+
+     if(!condition?.length) { 
+      throw new ApiError(404, "Channel doesn't exist")
+     }
+
+     return res
+     .status(200)
+     .json(
+      new ApiResponse(200, channel[0], "User channel  fetched successfully")
+     )
+})
+
+
 export {
    registerUser,
    loginUser,
@@ -393,5 +483,10 @@ export {
    getCurrentUser,
    updateAccountDetails,
    updateUserAvatar,
-   updateUserCoverImage
+   updateUserCoverImage,
+   getUserChannelProfile
 }
+
+
+
+
